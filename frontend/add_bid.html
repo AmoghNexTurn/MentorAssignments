@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Bid</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h2>Add Bid</h2>
+    <form id="addBidForm">
+        <table border="1">
+            <tbody>
+                <tr><td>Bidder Name</td><td><input type="text" name="BidderName" required></td></tr>
+                <tr><td>Worker Name</td><td><input type="text" name="WorkerName" required></td></tr>
+                <tr><td>Start Date (YYYYMMDD)</td><td><input type="text" name="StartDate" required></td></tr>
+                <tr><td>End Date (YYYYMMDD)</td><td><input type="text" name="EndDate" required></td></tr>
+                <tr><td>Hours Booked (Specify days and hours)</td><td><input type="text" name="HoursBooked" required></td></tr>
+                <tr><td>Hourly Rate</td><td><input type="text" name="HourlyRate" required></td></tr>
+                <tr><td colspan="2" style="text-align:center;"><button type="submit">Add Bid</button></td></tr>
+            </tbody>
+        </table>
+    </form>
+    <div id="apiResponse" style="margin-top:10px; white-space:pre-wrap;"></div>
+    <button onclick="window.location.href='index.html'">Home</button>
+    <script src="main.js"></script>
+</body>
+</html>

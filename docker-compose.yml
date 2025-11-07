@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:18
+    container_name: timeslot_app_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: data_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d 
+      
+
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://admin:adminpassword@db:5432/data_db
+
+volumes:
+  postgres_data:

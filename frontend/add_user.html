@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add User</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h2>Add User</h2>
+    <form id="addUserForm">
+        <table border="1">
+            <tbody>
+                <tr><td>Username</td><td><input type="text" name="UserName" required></td></tr>
+                <tr><td>Password</td><td><input type="text" name="UserPassword" required></td></tr>
+                <tr><td>Type</td><td><input type="text" name="UserType" required></td></tr>
+                <tr><td>Classification</td><td><input type="text" name="Classification" required></td></tr>
+                <tr><td>Available Hours (Only fill if type: worker. Specify days and hours)</td><td><input type="text" name="AvailableHours"></td></tr>
+                <tr><td colspan="2" style="text-align:center;"><button type="submit">Add User</button></td></tr>
+            </tbody>
+        </table>
+    </form>
+    <div id="apiResponse" style="margin-top:10px; white-space:pre-wrap;"></div>
+    <button onclick="window.location.href='index.html'">Home</button>
+    <script src="main.js"></script>
+</body>
+</html>

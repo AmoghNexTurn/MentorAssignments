@@ -1,0 +1,69 @@
+/* Import JetBrains Mono font */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'JetBrains Mono', monospace;
+    background-color: black;
+    color: white;
+    display: flex;
+    justify-content: center; /* horizontal centering */
+    align-items: center;     /* vertical centering */
+    text-align: center;
+    flex-direction: column;  /* stack content vertically */
+}
+
+input, button {
+    margin: 5px 0;
+    text-align: center;
+    background-color: #1a1a1a;
+    color: white;
+    border: 1px solid #555;
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+}
+
+input:focus, button:hover {
+    border-color: white;
+    outline: none;
+}
+
+table {
+    margin: 10px auto 0 auto;
+    border-collapse: collapse;
+    text-align: center;
+    width: auto;
+}
+
+th, td {
+    padding: 5px 10px;
+    text-align: center;
+    border: 1px solid #555;
+}
+
+/* Link styling */
+a {
+    color: white;      /* uniform link color */
+    text-decoration: none; /* remove underline */
+    display: inline-block;
+    padding: 8px 15px;
+    border: 1px solid white;
+    border-radius: 5px;
+    margin: 5px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+a:hover {
+    background-color: white;
+    color: black;
+}
+
+#apiResponse {
+    text-align: left;       /* Align text to the left */
+    white-space: pre-wrap;  /* Preserve JSON formatting */
+    margin-top: 20px;
+    font-family: inherit;   /* Keep the same font as body */
+}

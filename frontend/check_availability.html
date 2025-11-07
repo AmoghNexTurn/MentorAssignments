@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Check Availability</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h2>Check Availability</h2>
+    <form id="checkAvailabilityForm">
+        <table border="1">
+            <tbody>
+                <tr><td>Classification</td><td><input type="text" name="classification" required></td></tr>
+                <tr><td>Start Date (YYYYMMDD)</td><td><input type="date" name="StartDate" required></td></tr>
+                <tr><td>End Date (YYYYMMDD)</td><td><input type="date" name="EndDate" required></td></tr>
+                <tr><td>Hours Booked (7x2 list)</td><td><input type="text" name="HoursBooked" required></td></tr>
+                <tr><td colspan="2" style="text-align:center;"><button type="submit">Check Availability</button></td></tr>
+            </tbody>
+        </table>
+    </form>
+    <div id="apiResponse" style="margin-top:10px; white-space:pre-wrap;"></div>
+    <button onclick="window.location.href='index.html'">Home</button>
+    <script src="main.js"></script>
+</body>
+</html>
