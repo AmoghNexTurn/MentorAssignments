@@ -1,21 +1,57 @@
-import os
-import asyncio
+from fastapi import FastAPI, HTTPException, Query
+from typing import Literal
+from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError
+import requests
 from langchain.agents import create_agent
 from langchain_core.messages import convert_to_messages
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from configparser import ConfigParser
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph_supervisor import create_supervisor
 from langchain.chat_models import init_chat_model
-
-# Load config file
-config = ConfigParser()
-config.read('config.ini')
-
+import os
 
 load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
+
+config = ConfigParser()
+config.read("config.ini")
+
+base_url = "http://localhost:8000"
+
+
+def call_tool_api(tool_name, a, b):
+    url = f"{base_url}/tool/{tool_name}"
+    payload = {"a": a, "b": b}
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(
+            f"API call failed with status {response.status_code}: {response.text}")
+
+
+def tool1(a, b):
+    """Add two numbers."""
+    return call_tool_api("tool1", a, b)
+
+
+def tool2(a, b):
+    """Add two numbers, use this only if tool 1 isn't available."""
+    return call_tool_api("tool2", a, b)
+
+
+def tool3(a, b):
+    """Multiply two numbers."""
+    return call_tool_api("tool3", a, b)
+
+
+def tool4(a, b):
+    """Multiply two, use this only if tool 1 isn't available."""
+    return call_tool_api("tool4", a, b)
 
 
 def pretty_print_message(message, indent=False):
@@ -58,16 +94,7 @@ def pretty_print_messages(update, last_message=False):
         print("\n")
 
 
-client = MultiServerMCPClient({
-    "All Tool Server": {
-        "url": "http://127.0.0.1:8080/mcp",
-        "transport": "streamable_http",
-    }
-})
-
-
-async def get_tools():
-    tools = await client.get_tools()
+def get_tools(tools):
     agent1_tools = config.get(
         'agents', 'agent1_tools', fallback='').split(', ')
     agent2_tools = config.get(
@@ -75,20 +102,20 @@ async def get_tools():
     agent3_tools = config.get(
         'agents', 'agent3_tools', fallback='').split(', ')
 
-    tools1 = [t for t in tools if getattr(t, 'name', None) in agent1_tools]
-    tools2 = [t for t in tools if getattr(t, 'name', None) in agent2_tools]
-    tools3 = [t for t in tools if getattr(t, 'name', None) in agent3_tools]
-    return tools1, tools2, tools3
+    tools1 = [t for t in tools if t.__name__ in agent1_tools]
+    tools2 = [t for t in tools if t.__name__ in agent2_tools]
+    tools3 = [t for t in tools if t.__name__ in agent3_tools]
+    return [tools1, tools2, tools3]
 
-tools = asyncio.run(get_tools())
-# print(tools)
+
+tools = get_tools([tool1, tool2, tool3, tool4])
 agent1_enabled = config.getboolean('agents', 'agent1_enabled', fallback=False)
 agent2_enabled = config.getboolean('agents', 'agent2_enabled', fallback=False)
 agent3_enabled = config.getboolean('agents', 'agent3_enabled', fallback=False)
 agent1_tools = tools[0]
 agent2_tools = tools[1]
 agent3_tools = tools[2]
-
+# print(tools)
 agents = []
 
 if agent1_enabled:
@@ -100,7 +127,7 @@ if agent1_enabled:
         ),
         tools=agent1_tools,
         system_prompt=(
-            "You are a math agent that can add using the tools provided. Use the tools provided and just provide the output without checking.\n\n"
+            "You are a math agent that can add using the tools provided. Use the tools provided and just provide the output without checking if tools aren't there.\n\n"
             "INSTRUCTIONS:\n"
             "- After you're done with your tasks, respond to the supervisor directly\n"
             "- Do not do any work yourself, JUST USE THE TOOLS. IF THE ANSWER IS WRONG, RETURN THE WRONG ANSWER.\n"
@@ -163,35 +190,12 @@ supervisor = create_supervisor(
     output_mode="full_history",
 ).compile()
 
+# for chunk in add_agent.stream( # type: ignore
+#     {"messages": [{"role": "user", "content": "what's 3 + 5"}]}
+# ):
+#     pretty_print_messages(chunk)
 
-async def invoke_tool_async(agent, input_data):
-    results = []
-    async for chunk in agent.astream({"messages": input_data}):
-        pretty_print_messages(chunk)
-        results.append(chunk)
-    return results
-
-
-async def invoke_supervisor_async(agent, input_data):
-    last_chunk = None
-    async for chunk in agent.astream({"messages": input_data}):
-        pretty_print_messages(chunk, last_message=True)
-        last_chunk = chunk
-    return last_chunk
-
-
-async def main():
-    # single agent testing
-    # results = await invoke_tool_async(add_agent, [{"role": "user", "content": "7+8"}])
-    # supervisor agent testing
-    final_chunk = await invoke_supervisor_async(supervisor, [
-        {"role": "user", "content": "What is (4+3)*8 ?"}
-    ])
-    flag = 0
-    if final_chunk:
-        final_message_history = final_chunk["supervisor"]["messages"]
-        # You can now use final_message_history as needed
-        if flag:
-            print(final_message_history)
-
-asyncio.run(main())
+for chunk in supervisor.stream(
+    {"messages": [{"role": "user", "content": "(4+3)*8"}]}
+):
+    pretty_print_messages(chunk, last_message=True)
