@@ -221,6 +221,40 @@ def run_agent_async(agent, messages):
 
 @app.route('/add_agent', methods=['POST'])
 def call_add_agent():
+    """
+    Add Agent endpoint
+    ---
+    tags:
+      - Agent Operations
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              messages:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    role:
+                      type: string
+                      example: user
+                    content:
+                      type: string
+                      example: "2+3"
+    responses:
+      200:
+        description: Result from add_agent
+        content:
+          application/json:
+            schema:
+              type: string
+              example: "5"
+      400:
+        description: Validation error
+    """
     try:
         data = AgentRequest.parse_obj(request.json)
     except ValidationError as e:
@@ -233,6 +267,40 @@ def call_add_agent():
 
 @app.route('/multiply_agent', methods=['POST'])
 def call_multiply_agent():
+    """
+    Multiply Agent endpoint
+    ---
+    tags:
+      - Agent Operations
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              messages:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    role:
+                      type: string
+                      example: user
+                    content:
+                      type: string
+                      example: "2*3"
+    responses:
+      200:
+        description: Result from multiply_agent
+        content:
+          application/json:
+            schema:
+              type: string
+              example: "6"
+      400:
+        description: Validation error
+    """
     try:
         data = AgentRequest.parse_obj(request.json)
     except ValidationError as e:
@@ -245,6 +313,40 @@ def call_multiply_agent():
 
 @app.route('/combined_agent', methods=['POST'])
 def call_combined_agent():
+    """
+    Combined Agent endpoint
+    ---
+    tags:
+      - Agent Operations
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              messages:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    role:
+                      type: string
+                      example: user
+                    content:
+                      type: string
+                      example: "some operation"
+    responses:
+      200:
+        description: Result from combined_agent
+        content:
+          application/json:
+            schema:
+              type: string
+              example: "result"
+      400:
+        description: Validation error
+    """
     try:
         data = AgentRequest.parse_obj(request.json)
     except ValidationError as e:
