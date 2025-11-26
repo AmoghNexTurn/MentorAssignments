@@ -1,23 +1,57 @@
+from fastapi import FastAPI, HTTPException, Query
+from typing import Literal
+from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
-from flask import Flask, request, jsonify
-import os
-import asyncio
+import requests
 from langchain.agents import create_agent
 from langchain_core.messages import convert_to_messages
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from configparser import ConfigParser
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph_supervisor import create_supervisor
 from langchain.chat_models import init_chat_model
-
-# Load config file
-config = ConfigParser()
-config.read('config.ini')
-
+import os
 
 load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
+
+config = ConfigParser()
+config.read("config.ini")
+
+base_url = "http://localhost:8000"
+
+
+def call_tool_api(tool_name, a, b):
+    url = f"{base_url}/tool/{tool_name}"
+    payload = {"a": a, "b": b}
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(
+            f"API call failed with status {response.status_code}: {response.text}")
+
+
+def tool1(a, b):
+    """Add two numbers."""
+    return call_tool_api("tool1", a, b)
+
+
+def tool2(a, b):
+    """Add two numbers, use this only if tool 1 isn't available."""
+    return call_tool_api("tool2", a, b)
+
+
+def tool3(a, b):
+    """Multiply two numbers."""
+    return call_tool_api("tool3", a, b)
+
+
+def tool4(a, b):
+    """Multiply two, use this only if tool 1 isn't available."""
+    return call_tool_api("tool4", a, b)
 
 
 def pretty_print_message(message, indent=False):
@@ -60,16 +94,7 @@ def pretty_print_messages(update, last_message=False):
         print("\n")
 
 
-client = MultiServerMCPClient({
-    "All Tool Server": {
-        "url": "http://127.0.0.1:8080/mcp",
-        "transport": "streamable_http",
-    }
-})
-
-
-async def get_tools():
-    tools = await client.get_tools()
+def get_tools(tools):
     agent1_tools = config.get(
         'agents', 'agent1_tools', fallback='').split(', ')
     agent2_tools = config.get(
@@ -77,20 +102,20 @@ async def get_tools():
     agent3_tools = config.get(
         'agents', 'agent3_tools', fallback='').split(', ')
 
-    tools1 = [t for t in tools if getattr(t, 'name', None) in agent1_tools]
-    tools2 = [t for t in tools if getattr(t, 'name', None) in agent2_tools]
-    tools3 = [t for t in tools if getattr(t, 'name', None) in agent3_tools]
-    return tools1, tools2, tools3
+    tools1 = [t for t in tools if t.__name__ in agent1_tools]
+    tools2 = [t for t in tools if t.__name__ in agent2_tools]
+    tools3 = [t for t in tools if t.__name__ in agent3_tools]
+    return [tools1, tools2, tools3]
 
-tools = asyncio.run(get_tools())
-# print(tools)
+
+tools = get_tools([tool1, tool2, tool3, tool4])
 agent1_enabled = config.getboolean('agents', 'agent1_enabled', fallback=False)
 agent2_enabled = config.getboolean('agents', 'agent2_enabled', fallback=False)
 agent3_enabled = config.getboolean('agents', 'agent3_enabled', fallback=False)
 agent1_tools = tools[0]
 agent2_tools = tools[1]
 agent3_tools = tools[2]
-
+# print(tools)
 agents = []
 
 if agent1_enabled:
@@ -102,10 +127,10 @@ if agent1_enabled:
         ),
         tools=agent1_tools,
         system_prompt=(
-            "You are a math agent that can add using the tools provided. Use the tools provided and just provide the output without checking.\n\n"
+            "You are a math agent that can add using the tools provided. Use the tools provided and just provide the output without checking if tools aren't there.\n\n"
             "INSTRUCTIONS:\n"
-            "- After you're done with your tasks, respond to the supervisor directly\n"
-            "- Do not do any work yourself, JUST USE THE TOOLS. IF THE ANSWER IS WRONG, RETURN THE WRONG ANSWER.\n"
+            # "- After you're done with your tasks, respond to the supervisor directly\n"
+            # "- Do not do any work yourself, JUST USE THE TOOLS. IF THE ANSWER IS WRONG, RETURN THE WRONG ANSWER.\n"
             "- Respond ONLY with the results of your work, do NOT include ANY other text."
         ),
         name="add_agent",
@@ -166,197 +191,37 @@ supervisor = create_supervisor(
 ).compile()
 
 
-async def invoke_tool_async(agent, input_data):
-    results = []
-    async for chunk in agent.astream({"messages": input_data}):
-        pretty_print_messages(chunk)
-        results.append(chunk)
-    return results
-
-
-async def invoke_supervisor_async(agent, input_data):
-    last_chunk = None
-    async for chunk in agent.astream({"messages": input_data}):
-        pretty_print_messages(chunk, last_message=True)
-        last_chunk = chunk
-    return last_chunk
-
-
-async def main():
-    # single agent testing
-    # results = await invoke_tool_async(add_agent, [{"role": "user", "content": "7+8"}])
-    # supervisor agent testing
-    final_chunk = await invoke_supervisor_async(supervisor, [
-        {"role": "user", "content": "What is (4+3)*8 ?"}
-    ])
-    flag = 0
-    if final_chunk:
-        final_message_history = final_chunk["supervisor"]["messages"]
-        # You can now use final_message_history as needed
-        if flag:
-            print(final_message_history)
-
-# asyncio.run(main())
-
-
-app = Flask(__name__)
-
-# Define Pydantic model assuming messages input follows LangChain chat format
-
-
-class Message(BaseModel):
+class AgentMessage(BaseModel):
     role: str
     content: str
 
 
 class AgentRequest(BaseModel):
-    messages: list[Message]
-
-# Utility to run async agent calls synchronously in Flask
+    messages: list[AgentMessage]
 
 
-def run_agent_async(agent, messages):
-    return asyncio.run(invoke_tool_async(agent, messages))
+class Message(BaseModel):
+    message: str
 
 
-@app.route('/add_agent', methods=['POST'])
-def call_add_agent():
-    """
-    Add Agent endpoint
-    ---
-    tags:
-      - Agent Operations
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              messages:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    role:
-                      type: string
-                      example: user
-                    content:
-                      type: string
-                      example: "2+3"
-    responses:
-      200:
-        description: Result from add_agent
-        content:
-          application/json:
-            schema:
-              type: string
-              example: "5"
-      400:
-        description: Validation error
-    """
-    try:
-        data = AgentRequest.parse_obj(request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
-    results = run_agent_async(add_agent, [msg.dict() for msg in data.messages])
-    # Process the results as needed to form response (simplified here)
-    return jsonify(results[-1]['model']['messages'][0].content)
+app = FastAPI()
 
 
-@app.route('/multiply_agent', methods=['POST'])
-def call_multiply_agent():
-    """
-    Multiply Agent endpoint
-    ---
-    tags:
-      - Agent Operations
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              messages:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    role:
-                      type: string
-                      example: user
-                    content:
-                      type: string
-                      example: "2*3"
-    responses:
-      200:
-        description: Result from multiply_agent
-        content:
-          application/json:
-            schema:
-              type: string
-              example: "6"
-      400:
-        description: Validation error
-    """
-    try:
-        data = AgentRequest.parse_obj(request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
-    results = run_agent_async(
-        multiply_agent, [msg.dict() for msg in data.messages])
-    return jsonify(results[-1]['model']['messages'][0].content)
-
-
-@app.route('/combined_agent', methods=['POST'])
-def call_combined_agent():
-    """
-    Combined Agent endpoint
-    ---
-    tags:
-      - Agent Operations
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              messages:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    role:
-                      type: string
-                      example: user
-                    content:
-                      type: string
-                      example: "some operation"
-    responses:
-      200:
-        description: Result from combined_agent
-        content:
-          application/json:
-            schema:
-              type: string
-              example: "result"
-      400:
-        description: Validation error
-    """
-    try:
-        data = AgentRequest.parse_obj(request.json)
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-
-    results = run_agent_async(
-        combined_agent, [msg.dict() for msg in data.messages])
-    print(results)
-    return jsonify(results[-1]['model']['messages'][0].content)
-
-
-if __name__ == "__main__":
-    app.run(port=5000)
+@app.put("/tool/{name}", responses={404: {"model": Message}})
+def call_tool(
+    name: Literal["add_agent", "multiply_agent", "combined_agent"],
+    input: AgentRequest
+):
+    tool_map = {
+        "add_agent": globals().get("add_agent"),
+        "multiply_agent": globals().get("mulyiply_agent"),
+        "combined_agent": globals().get("combined_agent"),
+    }
+    fn = tool_map.get(name)
+    expr = input.messages[0].content
+    if fn is None:
+        return JSONResponse(status_code=404, content={"message": f"{name} is not enabled"})
+    return {
+        "tool": name,
+        "result": fn.invoke({"messages": [{"role": "user", "content": expr}]})
+    }
