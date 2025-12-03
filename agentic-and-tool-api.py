@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Query
 from typing import Literal
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ValidationError
 import requests
 from langchain.agents import create_agent
 from langchain_core.messages import convert_to_messages
@@ -20,6 +19,70 @@ config = ConfigParser()
 config.read("config.ini")
 
 base_url = "http://localhost:8000"
+
+tool1_enabled = config.getboolean("tools", "tool1", fallback=True)
+tool2_enabled = config.getboolean("tools", "tool2", fallback=True)
+tool3_enabled = config.getboolean("tools", "tool3", fallback=True)
+tool4_enabled = config.getboolean("tools", "tool4", fallback=True)
+
+# Define tools conditionally, same as in your snippet
+if tool1_enabled:
+    def tool1_api(a: float, b: float):
+        """Add two numbers."""
+        return a + b
+
+if tool2_enabled:
+    def tool2_api(a: float, b: float):
+        """Add two numbers, use this only if tool 1 isn't available."""
+        return a + b + b
+
+if tool3_enabled:
+    def tool3_api(a: float, b: float):
+        """Multiply two numbers."""
+        return a * b
+
+if tool4_enabled:
+    def tool4_api(a: float, b: float):
+        """Multiply two, use this only if tool 1 isn't available."""
+        return a * b * b
+
+# Create FastAPI app
+app = FastAPI(title="Tool and Agent API", description="Tool and Agent API")
+
+
+class ToolInput(BaseModel):
+    a: float
+    b: float
+
+
+class AgentMessage(BaseModel):
+    role: str
+    content: str
+
+
+class AgentRequest(BaseModel):
+    messages: list[AgentMessage]
+
+
+class Message(BaseModel):
+    message: str
+
+
+@app.post("/tool/{name}", responses={404: {"model": Message}}, tags=["Tool API"])
+def call_tool(
+    name: Literal["tool1", "tool2", "tool3", "tool4"],
+    input: ToolInput  # Pydantic model will parse request JSON body
+):
+    tool_map = {
+        "tool1": globals().get("tool1_api"),
+        "tool2": globals().get("tool2_api"),
+        "tool3": globals().get("tool3_api"),
+        "tool4": globals().get("tool4_api"),
+    }
+    fn = tool_map.get(name)
+    if fn is None:
+        return JSONResponse(status_code=404, content={"message": f"{name} is not enabled"})
+    return str(fn(input.a, input.b))
 
 
 def call_tool_api(tool_name, a, b):
@@ -191,37 +254,22 @@ supervisor = create_supervisor(
 ).compile()
 
 
-class AgentMessage(BaseModel):
-    role: str
-    content: str
-
-
-class AgentRequest(BaseModel):
-    messages: list[AgentMessage]
-
-
-class Message(BaseModel):
-    message: str
-
-
-app = FastAPI()
-
-
-@app.put("/tool/{name}", responses={404: {"model": Message}})
-def call_tool(
+@app.put("/agent/{name}", responses={404: {"model": Message}}, tags=["Agent API"])
+def call_agent(
     name: Literal["add_agent", "multiply_agent", "combined_agent"],
     input: AgentRequest
 ):
-    tool_map = {
+    agent_map = {
         "add_agent": globals().get("add_agent"),
-        "multiply_agent": globals().get("mulyiply_agent"),
+        "multiply_agent": globals().get("multiply_agent"),
         "combined_agent": globals().get("combined_agent"),
     }
-    fn = tool_map.get(name)
+    fn = agent_map.get(name)
     expr = input.messages[0].content
     if fn is None:
         return JSONResponse(status_code=404, content={"message": f"{name} is not enabled"})
-    return {
-        "tool": name,
-        "result": fn.invoke({"messages": [{"role": "user", "content": expr}]})
-    }
+    return fn.invoke({"messages": [{"role": "user", "content": expr}]})["messages"][-1].content
+# {
+#         "tool": name,
+#         "result": fn.invoke({"messages": [{"role": "user", "content": expr}]})
+#     }
