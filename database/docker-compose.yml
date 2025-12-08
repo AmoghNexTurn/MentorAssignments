@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: voluminous_db
+    restart: always
+    environment:
+      POSTGRES_USER: YOUR_USERNAME
+      POSTGRES_PASSWORD: YOUR_PASSWORD
+      POSTGRES_DB: YOUR_DATABASE
+    volumes:
+      - postgres_data:/var/lib/postgresql/data     # Named Docker volume
+      - ./initdb:/docker-entrypoint-initdb.d       # Optional init scripts
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:                                   # Declare persistent volume
